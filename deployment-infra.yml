@@ -1,0 +1,114 @@
+---
+AWSTemplateFormatVersion : "2010-09-09"
+Description: |
+  Sets up ec2 instance and installs the code deploy agent on it.
+  Further sets up a code deploy application and a deployment group.
+
+Parameters:
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair
+
+Resources:
+  EC2TrustRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - 
+            Effect: Allow
+            Principal:
+              Service: 
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+  RolePolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: AllowGetSourceCodePolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: 's3:*'
+            Resource: '*'
+      Roles:
+        - Ref: EC2TrustRole
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2TrustRole
+  InstanceSecurityGroup:
+    DeletionPolicy: Retain
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Public website, ssh access
+      GroupName: PublicWebsiteSShAccessable
+      VpcId: vpc-d8a106b2
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+  Instance:
+    Type: AWS::EC2::Instance
+    DeletionPolicy: Retain
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: "PT10M"
+    Properties:
+      InstanceType: t2.small
+      ImageId: !Ref LatestAmiId
+      KeyName: !Ref KeyName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      NetworkInterfaces: 
+      - AssociatePublicIpAddress: true
+        DeviceIndex: 0
+        SubnetId: subnet-0f513989b0a5b7970
+        GroupSet:
+          - !Ref InstanceSecurityGroup
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+            - ""
+            -
+              - "#!/bin/bash\n"
+              - "yum -y update\n"
+              - "yum -y install cfn-bootstrap\n"
+              - "/opt/aws/bin/cfn-init -v"
+              - !Sub " --stack ${AWS::StackName}"
+              - " --resource Instance"
+              - !Sub " --region ${AWS::Region} \n"
+      Tags:
+        - 
+          Key: Deploygroup
+          Value: Test
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              ruby: []
+          files:
+            /home/ec2-user/install:
+              source: !Sub "https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install"
+              mode: "000755"
+          commands:
+            00-install-agent:
+              command: ./install auto
+              cwd: /home/ec2-user/
+            01-cfn-signal:
+              command: !Sub "/opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource Instance --region ${AWS::Region}"

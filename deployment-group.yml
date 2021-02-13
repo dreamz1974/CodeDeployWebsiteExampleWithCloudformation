@@ -1,0 +1,62 @@
+---
+AWSTemplateFormatVersion : "2010-09-09"
+Description: |
+  Creates the application and deployment group.
+
+Resources:
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: DemoApplication
+      ComputePlatform: Server
+  CodeDeployTrustRole:
+    Type: AWS::IAM::Role
+    Properties:
+        RoleName: CodeDeployTrustRole
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codedeploy.amazonaws.com 
+            Action:
+              - sts:AssumeRole
+  RolePolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: AllowCodeDeployOnEC2Policy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: 
+              - 'iam:PassRole'
+              - 'ec2:*'
+            Resource: '*'
+      Roles:
+        - Ref: CodeDeployTrustRole
+  DeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName:
+        !Ref CodeDeployApplication
+      Ec2TagFilters:
+        - 
+          Key: Deploygroup
+          Value: Test
+          Type: KEY_AND_VALUE
+      ServiceRoleArn:
+        !GetAtt CodeDeployTrustRole.Arn
+
+Outputs:
+  ApplicationName:
+    Description: Codedeploy application name
+    Value: !Ref CodeDeployApplication
+    Export: 
+      Name: !Sub "${AWS::StackName}-ApplicationName"
+  DeploymentGroupName:
+    Description: Name of deployment group to deploy application to
+    Value: !Ref DeploymentGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-DeploymentGroupName"
