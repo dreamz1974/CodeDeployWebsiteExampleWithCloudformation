@@ -6,7 +6,7 @@ This example extends the
 
 Using cloudformation to do all the hard lifting:
 - Setting up EC2 instance for code deploy with code deploy agent installed
-- Setting up codedploy application and pipelint
+- Setting up codedploy application and pipeline
 - Events for automatic run of codedeploy pipeline
 
 **You will be charged for creating AWS resources.**
@@ -14,7 +14,7 @@ Using cloudformation to do all the hard lifting:
 ## Manual
 Just run the following 4 commands:
 
-You only have to have an ec2 keypair for the instace, you have to specify the name of the keypair in the first command by replacing *\<Ec2KeyName\>* with the actual name and without \<\>.
+You only have to have an ec2 keypair for the instance, you have to specify the name of the keypair in the first command by replacing *\<Ec2KeyName\>* with the actual name and without \<\>.
 
 1. `aws cloudformation create-stack --stack-name deployment-infra --template-body file://deployment-infra.yml --parameters "ParameterKey=KeyName,ParameterValue=<Ec2KeyName>" --capabilities CAPABILITY_IAM`
 
